@@ -23,3 +23,8 @@ class ProvEmbeddingRequest(BaseModel):
     size: Optional[int] = None
     callbackUrl: str
     callbackKey: Optional[str] = None
+
+
+class ProvEmbeddingDeleteRequest(BaseModel):
+    comId: str
+    provNo: int

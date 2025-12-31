@@ -1,11 +1,13 @@
-from fastapi import BackgroundTasks, FastAPI
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, status, Body
 
 import weaviate
 from weaviate.connect import ConnectionParams
 
-from app.schemas import ProvEmbeddingRequest, RunRequest
+from app.core.config import settings
+from app.schemas import ProvEmbeddingDeleteRequest, ProvEmbeddingRequest, RunRequest
 from app.workers.meetings import process_job
 from app.workers.prov_documents import process_prov_embedding
+from app.services.weaviate_store import delete_prov_chunks
 
 app = FastAPI(title="Meeting AI")
 
@@ -38,7 +40,6 @@ def run_ai(req: RunRequest, background: BackgroundTasks):
     return {"queued": True, "meetNo": req.meetNo}
 
 
-@app.post("/ai/prov-documents/embedding")
 @app.post("/api/v1/prov-documents/embedding")
 def run_prov_embedding(req: ProvEmbeddingRequest, background: BackgroundTasks):
     print(f"[PROV EMBEDDING RUN] provNo={req.provNo}, objectKey={req.objectKey}")
@@ -48,3 +49,16 @@ def run_prov_embedding(req: ProvEmbeddingRequest, background: BackgroundTasks):
     """
     background.add_task(process_prov_embedding, req)
     return {"queued": True, "provNo": req.provNo}
+
+
+@app.delete("/api/v1/prov-documents/embedding")
+def delete_prov_embedding(
+    req: ProvEmbeddingDeleteRequest = Body(...), 
+    x_callback_secret: str = Header(..., alias="X-CALLBACK-SECRET", convert_underscores=False),
+):
+    expected = settings.CALLBACK_KEY
+    if not expected or x_callback_secret != expected:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    deleted = delete_prov_chunks(req.comId, req.provNo)
+    return {"deleted": deleted, "comId": req.comId, "provNo": req.provNo}

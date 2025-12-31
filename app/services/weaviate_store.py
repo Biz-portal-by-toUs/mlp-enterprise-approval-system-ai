@@ -3,6 +3,7 @@ from typing import List
 
 import weaviate
 from weaviate.classes.config import Configure, DataType, Property
+from weaviate.classes.query import Filter
 from weaviate.connect import ConnectionParams
 
 from app.core.config import settings
@@ -69,3 +70,24 @@ def store_prov_chunks(
             },
             vector=vec.tolist(),
         )
+
+
+def delete_prov_chunks(com_id: str, prov_no: int) -> int:
+    """
+    Delete all chunks for a company/provNo. Returns deleted count (best-effort).
+    """
+    client = get_client()
+    ensure_collection(client)
+    coll = client.collections.get(COLLECTION_NAME)
+    where = Filter.all_of([
+        Filter.by_property("comId").equal(com_id),
+        Filter.by_property("provNo").equal(prov_no),
+    ])
+    res = coll.data.delete_many(where=where)
+    try:
+        deleted = res.results["successful"]  # type: ignore[dict-item]
+        print(f"[WEAVIATE] delete comId={com_id} provNo={prov_no} deleted={deleted}")
+        return deleted
+    except Exception as e:
+        print(f"[WEAVIATE] delete result parse failed: {e} raw={res}")
+        return 0

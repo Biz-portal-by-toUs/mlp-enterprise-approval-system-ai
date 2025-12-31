@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     CALLBACK_HEADER: str 
     CALLBACK_KEY: str 
     CALLBACK_BASE_URL: str | None = None
+    CALLBACK_DELETE_HEADER: str = "X-CALLBACK-SECRET"
 
     # Weaviate
     WEAVIATE_HTTP_URL: str | None = "http://localhost:8080"
