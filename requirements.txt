@@ -24,3 +24,5 @@ olefile
 httpx
 SQLAlchemy
 pymysql
+openai
+pydantic_settings

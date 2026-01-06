@@ -1,3 +1,4 @@
+import re
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -7,6 +8,26 @@ from sqlalchemy.engine import Engine
 from app.clients import openai_client
 from app.core.config import settings
 
+ALLOWED_TABLES = {
+    "approval_line",
+    "attendance",
+    "board",
+    "corporate_car",
+    "corporate_car_reservation",
+    "meeting_room",
+    "meeting_room_reservation",
+    "shared_equipment",
+    "shared_equipment_reservation",
+    "emp_schedule",
+    "employee",
+    "todo_list",
+    "mail",
+    "meeting",
+    "meeting_emp",
+    "schedule",
+}
+
+PERSONAL_TABLES = {"todo_list", "mail", "attendance", "emp_schedule"}
 
 @lru_cache(maxsize=1)
 def get_engine() -> Engine:
@@ -76,6 +97,27 @@ def _is_safe_select(sql: str) -> bool:
     return not any(f" {b} " in lowered for b in banned)
 
 
+def _ensure_limit(sql: str, default_limit: int = 50) -> str:
+    if re.search(r"\blimit\b", sql, re.IGNORECASE):
+        return sql
+    return f"{sql} LIMIT {default_limit}"
+
+
+def _extract_tables(sql: str) -> List[str]:
+    # 매우 단순한 FROM/JOIN 테이블명 추출
+    tbls = re.findall(r"(?:from|join)\s+([`\"\w]+)", sql, flags=re.IGNORECASE)
+    return [t.strip("`\"").lower() for t in tbls]
+
+
+def _ensure_allowed_tables(sql: str):
+    tables = _extract_tables(sql)
+    if not tables:
+        return
+    for t in tables:
+        if t not in ALLOWED_TABLES:
+            raise RuntimeError(f"허용되지 않은 테이블 접근 시도: {t}")
+
+
 def execute_select(sql: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """
     SELECT만 실행. 결과를 dict 리스트로 반환.
@@ -106,14 +148,36 @@ def _ensure_com_filter(sql: str, com_id: Optional[str]) -> Tuple[str, Dict[str, 
     return sql, params
 
 
-def query_db_with_llm(question: str, com_id: Optional[str]) -> List[Dict[str, Any]]:
+def _ensure_personal_filter(sql: str, tables: List[str], emp_id: Optional[str]) -> Tuple[str, Dict[str, Any]]:
+    params: Dict[str, Any] = {}
+    if not emp_id:
+        return sql, params
+    if not any(t in PERSONAL_TABLES for t in tables):
+        return sql, params
+    lowered = sql.lower()
+    if "emp_id" not in lowered:
+        if " where " in lowered:
+            sql = f"{sql} AND emp_id = :emp_id"
+        else:
+            sql = f"{sql} WHERE emp_id = :emp_id"
+    params["emp_id"] = emp_id
+    return sql, params
+
+
+def query_db_with_llm(question: str, com_id: Optional[str], emp_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     질문을 SQL로 변환 후 실행. 결과 반환.
     """
     schema = _schema_summary()
     sql = _generate_select_sql(question, schema, com_id)
+    sql = _ensure_limit(sql)
+    _ensure_allowed_tables(sql)
+    tables = _extract_tables(sql)
     sql, params = _ensure_com_filter(sql, com_id)
-    return execute_select(sql, params)
+    # 개인 테이블 필터 병합
+    p_sql, p_params = _ensure_personal_filter(sql, tables, emp_id)
+    params.update(p_params)
+    return execute_select(p_sql, params)
 
 
 def query_employee_contact_by_name(name_keyword: str, com_id: Optional[str]) -> List[Dict[str, Any]]:

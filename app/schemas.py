@@ -37,3 +37,13 @@ class ChatbotRunRequest(BaseModel):
     question: str
     callbackUrl: str
     callbackKey: str
+    history: Optional[list["ChatHistoryMessage"]] = None
+
+
+class ChatHistoryMessage(BaseModel):
+    role: str  # user | assistant
+    content: str
+
+
+# Forward reference resolve
+ChatbotRunRequest.model_rebuild()
