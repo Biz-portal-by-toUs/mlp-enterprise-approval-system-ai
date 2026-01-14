@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     AWS_ACCESS_KEY: str
     AWS_SECRET_KEY: str
-    EMBED_MODEL: str = "BAAI/bge-m3"
+    EMBED_MODEL: str = "text-embedding-3-small"
     EMBED_CHUNK_WORDS: int = 400
     EMBED_CHUNK_OVERLAP: int = 50
     RDB_MODEL: str = "gpt-4o-mini"
