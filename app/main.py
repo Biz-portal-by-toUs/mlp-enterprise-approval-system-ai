@@ -4,11 +4,16 @@ import weaviate
 from weaviate.connect import ConnectionParams
 
 from app.core.config import settings
-from app.schemas import ProvEmbeddingDeleteRequest, ProvEmbeddingRequest, RunRequest
+from app.schemas import (
+    ProvEmbeddingDeleteRequest,
+    ProvEmbeddingRequest,
+    ProvEmbeddingStatusUpdateRequest,
+    RunRequest,
+)
 from app.routers.chatbot import router as chatbot_router
 from app.workers.meetings import process_job
 from app.workers.prov_documents import process_prov_embedding
-from app.services.provdocuments.weaviate_store import delete_prov_chunks
+from app.services.provdocuments.weaviate_store import delete_prov_chunks, update_prov_chunks_public
 
 app = FastAPI(title="Meeting AI")
 app.include_router(chatbot_router)
@@ -64,3 +69,20 @@ def delete_prov_embedding(
 
     deleted = delete_prov_chunks(req.comId, req.provNo)
     return {"deleted": deleted, "comId": req.comId, "provNo": req.provNo}
+
+
+@app.patch("/api/v1/prov-documents/embedding/status")
+def update_prov_embedding_status(
+    req: ProvEmbeddingStatusUpdateRequest = Body(...),
+    x_callback_secret: str = Header(..., alias="X-CALLBACK-SECRET", convert_underscores=False),
+):
+    expected = settings.CALLBACK_KEY
+    if not expected or x_callback_secret != expected:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    updated = update_prov_chunks_public(req.comId, req.provNo, req.isPublic)
+    return {
+        "updated": updated,
+        "comId": req.comId,
+        "provNo": req.provNo,
+        "isPublic": req.isPublic,
+    }

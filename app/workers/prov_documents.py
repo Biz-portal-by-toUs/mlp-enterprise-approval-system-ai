@@ -72,6 +72,7 @@ def process_prov_embedding(req: ProvEmbeddingRequest):
                     prov_no=prov_no,
                     object_key=req.objectKey,
                     original_name=req.originalName,
+                    is_public=req.isPublic,
                     chunks=chunks,
                     embeddings=embs,
                 )

@@ -21,6 +21,7 @@ class ProvEmbeddingRequest(BaseModel):
     originalName: str
     contentType: Optional[str] = None
     size: Optional[int] = None
+    isPublic: Optional[bool] = None
     callbackUrl: str
     callbackKey: Optional[str] = None
 
@@ -28,6 +29,12 @@ class ProvEmbeddingRequest(BaseModel):
 class ProvEmbeddingDeleteRequest(BaseModel):
     comId: str
     provNo: int
+
+
+class ProvEmbeddingStatusUpdateRequest(BaseModel):
+    comId: str
+    provNo: int
+    isPublic: bool
 
 
 class ChatbotRunRequest(BaseModel):

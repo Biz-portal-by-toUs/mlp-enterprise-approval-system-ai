@@ -40,6 +40,7 @@ def ensure_collection(client: weaviate.WeaviateClient):
             Property(name="originalName", data_type=DataType.TEXT),
             Property(name="chunkIndex", data_type=DataType.INT),
             Property(name="content", data_type=DataType.TEXT),
+            Property(name="isPublic", data_type=DataType.BOOL),
         ],
     )
 
@@ -49,6 +50,7 @@ def store_prov_chunks(
     prov_no: int,
     object_key: str,
     original_name: str,
+    is_public: Optional[bool],
     chunks: List[str],
     embeddings,
 ):
@@ -68,6 +70,7 @@ def store_prov_chunks(
                 "originalName": original_name,
                 "chunkIndex": idx,
                 "content": chunk,
+                "isPublic": bool(is_public) if is_public is not None else False,
             },
             vector=vec.tolist(),
         )
@@ -94,6 +97,45 @@ def delete_prov_chunks(com_id: str, prov_no: int) -> int:
         return 0
 
 
+def update_prov_chunks_public(com_id: str, prov_no: int, is_public: bool, batch_size: int = 200) -> int:
+    """
+    Update isPublic metadata for all chunks matching com_id + prov_no.
+    """
+    client = get_client()
+    ensure_collection(client)
+    coll = client.collections.get(COLLECTION_NAME)
+    where = Filter.all_of([
+        Filter.by_property("comId").equal(com_id),
+        Filter.by_property("provNo").equal(prov_no),
+    ])
+
+    updated = 0
+    offset = 0
+    while True:
+        res = coll.query.fetch_objects(
+            filters=where,
+            limit=batch_size,
+            offset=offset,
+            return_properties=["isPublic"],
+        )
+        objs = getattr(res, "objects", None) or []
+        if not objs:
+            break
+        for obj in objs:
+            obj_id = getattr(obj, "uuid", None) or getattr(obj, "id", None)
+            if not obj_id:
+                continue
+            try:
+                coll.data.update(uuid=obj_id, properties={"isPublic": bool(is_public)})
+                updated += 1
+            except Exception as e:
+                print(f"[WEAVIATE] update failed for {obj_id}: {e}")
+        offset += len(objs)
+
+    print(f"[WEAVIATE] update comId={com_id} provNo={prov_no} isPublic={is_public} updated={updated}")
+    return updated
+
+
 def search_prov_chunks(
     query: str,
     top_k: int = 5,
@@ -114,6 +156,7 @@ def search_prov_chunks(
         where_filters.append(Filter.by_property("comId").equal(com_id))
     if prov_no is not None:
         where_filters.append(Filter.by_property("provNo").equal(prov_no))
+    where_filters.append(Filter.by_property("isPublic").equal(True))
     where = Filter.all_of(where_filters) if where_filters else None
 
     res = coll.query.near_vector(
