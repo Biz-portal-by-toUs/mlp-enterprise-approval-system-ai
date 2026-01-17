@@ -28,6 +28,7 @@ def _absolute_callback_url(cb: str) -> str:
 def process_prov_embedding(req: ProvEmbeddingRequest):
     prov_no = req.provNo
     callback_url = _absolute_callback_url(_format_callback_url(req.callbackUrl, prov_no))
+    print(f"[PROV] raw callbackUrl={req.callbackUrl}")
     callback_key = req.callbackKey or settings.CALLBACK_KEY
     if not callback_key:
         raise RuntimeError("callbackKey가 없습니다. 요청에 포함하거나 CALLBACK_KEY env를 설정하세요.")
