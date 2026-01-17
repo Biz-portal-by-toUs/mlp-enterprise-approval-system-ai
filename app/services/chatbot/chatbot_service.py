@@ -84,6 +84,7 @@ def run_chatbot(req: ChatbotRunRequest):
                         "done": False,
                         "success": True,
                     }
+                    print(f"[CHATBOT] stream chunk seq={seq} messageId={req.messageId} delta={delta['chunk']!r}")
                     seq += 1
                     post_with_retry(callback_url, req.callbackKey, payload)
                 if delta.get("done"):
