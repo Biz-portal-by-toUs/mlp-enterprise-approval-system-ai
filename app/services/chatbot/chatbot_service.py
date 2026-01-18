@@ -73,7 +73,7 @@ def run_chatbot(req: ChatbotRunRequest):
         try:
             import time
 
-            flush_interval_s = 0.1
+            flush_interval_s = 0.05
             seq = 0
             full_answer_parts: List[str] = []
             buffer_text = ""
